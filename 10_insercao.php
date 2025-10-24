@@ -18,47 +18,35 @@
 <?php
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Recebe os valores enviados
-    $nome = trim($_POST['nome']);
-    $email = trim($_POST['email']);
-
-    // Validação simples
-    if (empty($nome) || empty($email)) {
-        echo "<p style='color: red;'>Por favor, preencha todos os campos.</p>";
-        exit;
-    }
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        echo "<p style='color: red;'>Digite um email válido!</p>";
-        exit;
-    }
+    $nome = $_POST['nome'];
+    $email = $_POST['email'];
 
     // Conecta ao banco de dados
     $servername = "localhost";
     $username = "root";
-    $password = "";
+    $password = "Senai@118";
     $dbname = "exercicio";
 
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    $conn->set_charset("utf8");
+    $conn = new mysqli( $servername, $username, $password, $dbname );
+  
 
     // Verifica a conexão
     if ($conn->connect_error) {
         die("<p style='color: red;'>Falha na conexão: " . $conn->connect_error . "</p>");
     }
 
-    // Prepara o comando SQL com segurança contra SQL Injection
-    $stmt = $conn->prepare("INSERT INTO clientes (nome, email) VALUES (?, ?)");
-    $stmt->bind_param("ss", $nome, $email);
+   // Insere o registro
+   $sql = "INSERT INTO clientes (nome, email) VALUES ('$nome', '$email')";
 
-    if ($stmt->execute()) {
-        echo "<p style='color: green;'>Cliente cadastrado com sucesso!</p>";
-    } else {
-        echo "<p style='color: red;'>Erro ao cadastrar: " . $stmt->error . "</p>";
-    }
-
-    $stmt->close();
-    $conn->close();
+   if ($conn->query($sql) --- TRUE) {
+    echo "<p stryle='color: green,'>Cliente cadastrado com sucesso</p>";
+} else {   
+    echo "<p style='color: red; '>Erro ao cadastrar: " . $conn->error . "</p>";
 }
+}
+//fecha conexão
+
+$conn->close();
 ?>
 </body>
 </html>
