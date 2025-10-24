@@ -1,50 +1,81 @@
+<!-- Passar id via URL -->
+<!-- http://localhost/php_basico_out-2024/12_atualizar.php?id=1 -->
+
 <?php
 // Conecta ao banco de dados
 $servername = "localhost";
 $username = "root";
-$password = "";
 $dbname = "exercicio";
+$password = "Senai@118";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
+$conn->set_charset("utf8mb4");
 
 // Verifica a conexão
 if ($conn->connect_error) {
-    die("<p style='color:red;'>💀 Falha na conexão: " . $conn->connect_error . "</p>");
+    die("Falha na conexão: " . $conn->connect_error);
 }
 
-// Inicializa a variável cliente
 $cliente = null;
 
-// Verifica se o ID foi passado via URL (para edição)
-if (isset($_GET['id'])) {
-    $id = intval($_GET['id']); // segurança: converte pra número inteiro
-    $sql = "SELECT * FROM clientes WHERE id = $id";
-    $result = $conn->query($sql);
+// --- Se for GET: buscar cliente pelo id (com prepared statement)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
+    $id_get = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+    if ($id_get === false) {
+        echo "ID inválido.";
+        exit();
+    }
 
-    if ($result->num_rows > 0) {
+    $stmt = $conn->prepare("SELECT id, nome, email FROM clientes WHERE id = ?");
+    $stmt->bind_param("i", $id_get);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result && $result->num_rows > 0) {
         $cliente = $result->fetch_assoc();
     } else {
-        echo "<p style='color:orange;'>⚠ Cliente não encontrado.</p>";
-        exit;
+        echo "Cliente não encontrado.";
+        exit();
+    }
+
+    $stmt->close();
+}
+
+// --- Se for POST: atualizar cliente (com prepared statement)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // validação básica
+    $id_post = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+    $nome = trim((string)($_POST['nome'] ?? ''));
+    $email = trim((string)($_POST['email'] ?? ''));
+
+    if ($id_post === false || $id_post === null) {
+        echo "<p>ID inválido.</p>";
+    } elseif ($nome === '' || $email === '') {
+        echo "<p>Nome e e-mail são obrigatórios.</p>";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo "<p>E-mail inválido.</p>";
+    } else {
+        $stmt = $conn->prepare("UPDATE clientes SET nome = ?, email = ? WHERE id = ?");
+        if ($stmt === false) {
+            echo "<p>Erro ao preparar a query: " . htmlspecialchars($conn->error) . "</p>";
+        } else {
+            $stmt->bind_param("ssi", $nome, $email, $id_post);
+            if ($stmt->execute()) {
+                // redireciona pra mesma página com id no GET e mensagem (PRG pattern)
+                header("Location: " . $_SERVER['PHP_SELF'] . "?id=" . $id_post . "&updated=1");
+                exit();
+            } else {
+                echo "<p>Erro ao atualizar cliente: " . htmlspecialchars($stmt->error) . "</p>";
+            }
+            $stmt->close();
+        }
     }
 }
 
-// Verifica se o formulário foi enviado (para atualizar o cliente)
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $id = intval($_POST['id']);
-    $nome = trim($_POST['nome']);
-    $email = trim($_POST['email']);
-
-    if (!empty($nome) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $sql = "UPDATE clientes SET nome = '$nome', email = '$email' WHERE id = $id";
-        if ($conn->query($sql) === TRUE) {
-            echo "<p style='color:limegreen;'>✅ Cliente atualizado com sucesso!</p>";
-        } else {
-            echo "<p style='color:red;'>❌ Erro ao atualizar: " . $conn->error . "</p>";
-        }
-    } else {
-        echo "<p style='color:orange;'>⚠ Preencha todos os campos corretamente.</p>";
-    }
+// Se vier da atualização, pega a mensagem
+$mensagem_sucesso = '';
+if (isset($_GET['updated']) && $_GET['updated'] == '1') {
+    $mensagem_sucesso = "<p>Cliente atualizado com sucesso!</p>";
 }
 ?>
 
@@ -53,74 +84,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <title>Editar Cliente</title>
-    <style>
-        body {
-            background-color: #111;
-            color: #f0f0f0;
-            font-family: 'Segoe UI', sans-serif;
-            text-align: center;
-            padding: 40px;
-        }
-        form {
-            background-color: #1b1b1b;
-            padding: 20px;
-            border-radius: 10px;
-            display: inline-block;
-            box-shadow: 0 0 15px #ff0077;
-        }
-        input {
-            margin: 10px 0;
-            padding: 10px;
-            width: 90%;
-            border: none;
-            border-radius: 6px;
-            background-color: #2b2b2b;
-            color: #fff;
-        }
-        button {
-            background-color: #ff0077;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        button:hover {
-            background-color: #ff3399;
-        }
-        a {
-            display: block;
-            margin-top: 15px;
-            color: #ff0077;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
 </head>
 <body>
 
-    <h1>✏️ Editar Cliente</h1>
+<?php echo $mensagem_sucesso; ?>
 
-    <form method="post" action="">
-        <input type="hidden" name="id" value="<?php echo $cliente['id'] ?? ''; ?>">
+<form method="POST" action="">
+    <input type="hidden" name="id" value="<?php echo isset($cliente['id']) ? htmlspecialchars($cliente['id']) : ''; ?>">
 
-        <label for="nome">Nome:</label><br>
-        <input type="text" name="nome" value="<?php echo htmlspecialchars($cliente['nome'] ?? ''); ?>" required><br>
+    <label for="nome">Nome:</label>
+    <input type="text" id="nome" name="nome" value="<?php echo isset($cliente['nome']) ? htmlspecialchars($cliente['nome']) : ''; ?>" required><br>
 
-        <label for="email">Email:</label><br>
-        <input type="email" name="email" value="<?php echo htmlspecialchars($cliente['email'] ?? ''); ?>" required><br>
+    <label for="email">E-mail:</label>
+    <input type="email" id="email" name="email" value="<?php echo isset($cliente['email']) ? htmlspecialchars($cliente['email']) : ''; ?>" required><br><br>
 
-        <button type="submit">Atualizar</button>
-    </form>
-
-    <a href="listar_clientes.php">⬅ Voltar à lista de clientes</a>
+    <button type="submit">Atualizar</button>
+</form>
 
 </body>
 </html>
-
-
-
-
