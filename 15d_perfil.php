@@ -22,3 +22,4 @@ $cor = $_SESSION['cor'];
     <p><a href="15d_logout.php" style="color: white; text-decoration: underline;">Sair</a></p>
 </body>
 </html>
+0
